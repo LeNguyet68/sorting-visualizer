@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sorting Visualizer — 9 Thuật Toán</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="wrap">
+    <h1>Sorting Visualizer — 9 Thuật toán hehehe</h1>
+
+    <div class="controls">
+      <div class="row">
+        <label>Thuật toán
+          <select id="algo">
+            <option value="bubble">Bubble Sort</option>
+            <option value="selection">Selection Sort</option>
+            <option value="insertion">Insertion Sort</option>
+            <option value="merge">Merge Sort</option>
+            <option value="quick">Quick Sort</option>
+            <option value="heap">Heap Sort</option>
+            <option value="shell">Shell Sort</option>
+            <option value="cocktail">Cocktail Shaker</option>
+            <option value="counting">Counting Sort</option>
+          </select>
+        </label>
+
+        <label>Số lượng <input id="count" type="number" min="2" max="60" value="12"></label>
+
+        <label>Nhập dãy (dấu cách hoặc dấu phẩy)
+          <input id="inputArr" placeholder="ví dụ: 1 2 3 4 5" />
+        </label>
+
+        <button id="gen">Tạo ngẫu nhiên</button>
+        <button id="load">Tải dãy</button>
+      </div>
+
+      <div class="row">
+        <button id="play">Play</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="prev">Prev</button>
+        <button id="next">Next</button>
+
+        <label>Tốc độ (ms)
+          <input id="speed" type="range" min="50" max="1000" value="250">
+        </label>
+        <span id="speedLabel">250ms</span>
+
+        <label> Tốc độ phát
+          <select id="rate">
+            <option value="1">1x</option>
+            <option value="2">2x</option>
+            <option value="4">4x</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row smallinfo">
+        <div>So sánh: <span id="comp">0</span></div>
+        <div>Hoán đổi: <span id="swp">0</span></div>
+        <div>Bước: <span id="stepIdx">0</span>/<span id="stepTotal">0</span></div>
+      </div>
+    </div>
+
+    <div id="stage">
+      <div id="arrowLayer"></div>
+      <div id="boxes"></div>
+    </div>
+
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
