@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Sorting Visualizer — 9 Thuật Toán</title>
+  <title>9 thuật toán sắp xếp cơ bản</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="wrap">
-    <h1>Sorting Visualizer — 9 Thuật toán hehehe</h1>
+    <h1>Sorting Visualizer</h1>
 
     <div class="controls">
       <div class="row">
@@ -26,28 +26,28 @@
           </select>
         </label>
 
-        <label>Số lượng <input id="count" type="number" min="2" max="60" value="12"></label>
+        <label>Số lượng <input id="count" type="number" min="2" max="100" value="15"></label>
 
-        <label>Nhập dãy (dấu cách hoặc dấu phẩy)
-          <input id="inputArr" placeholder="ví dụ: 1 2 3 4 5" />
+        <label>Nhập dãy số
+          <input id="inputArr" placeholder="Ví dụ: 10, 50, 20, 80" />
         </label>
 
-        <button id="gen">Tạo ngẫu nhiên</button>
-        <button id="load">Tải dãy</button>
+        <button id="gen" class="btn-secondary">Ngẫu nhiên</button>
+        <button id="load" class="btn-secondary">Tải dãy</button>
       </div>
 
       <div class="row">
-        <button id="play">Play</button>
-        <button id="pause" disabled>Pause</button>
-        <button id="prev">Prev</button>
-        <button id="next">Next</button>
+        <button id="play" class="btn-primary">PLAY</button>
+        <button id="pause" disabled>PAUSE</button>
+        <button id="prev">PREV</button>
+        <button id="next">NEXT</button>
 
         <label>Tốc độ (ms)
-          <input id="speed" type="range" min="50" max="1000" value="250">
+          <input id="speed" type="range" min="10" max="1000" value="200">
         </label>
-        <span id="speedLabel">250ms</span>
+        <span id="speedLabel">200ms</span>
 
-        <label> Tốc độ phát
+        <label>Phát
           <select id="rate">
             <option value="1">1x</option>
             <option value="2">2x</option>
@@ -57,17 +57,15 @@
       </div>
 
       <div class="row smallinfo">
-        <div>So sánh: <span id="comp">0</span></div>
-        <div>Hoán đổi: <span id="swp">0</span></div>
-        <div>Bước: <span id="stepIdx">0</span>/<span id="stepTotal">0</span></div>
+        <div>So sánh: <b id="comp">0</b></div>
+        <div>Hoán đổi: <b id="swp">0</b></div>
+        <div>Bước: <b id="stepIdx">0</b> / <b id="stepTotal">0</b></div>
       </div>
     </div>
 
     <div id="stage">
-      <div id="arrowLayer"></div>
       <div id="boxes"></div>
     </div>
-
   </div>
   <script src="script.js"></script>
 </body>
