@@ -1,16 +1,11 @@
-// lấy các ptu
 const boxesEl = document.getElementById('boxes');
-const arrowLayer = document.getElementById('arrowLayer');
-
 const algoEl = document.getElementById('algo');
 const countEl = document.getElementById('count');
 const inputArrEl = document.getElementById('inputArr');
-const genBtn = document.getElementById('gen');
 const loadBtn = document.getElementById('load');
+const genBtn = document.getElementById('gen');
 const playBtn = document.getElementById('play');
 const pauseBtn = document.getElementById('pause');
-const nextBtn = document.getElementById('next');
-const prevBtn = document.getElementById('prev');
 const speedEl = document.getElementById('speed');
 const speedLabel = document.getElementById('speedLabel');
 const rateEl = document.getElementById('rate');
@@ -18,360 +13,216 @@ const compEl = document.getElementById('comp');
 const swpEl = document.getElementById('swp');
 const stepIdxEl = document.getElementById('stepIdx');
 const stepTotalEl = document.getElementById('stepTotal');
-// biến toàn cục
+
 let baseArray = [];
 let steps = [];
 let stepIndex = -1;
 let playing = false;
 let timerId = null;
-let compCount = 0, swapCount = 0;
+let currentComp = 0, currentSwp = 0;
 
-// cập nhật nhãn speed
-speedEl.addEventListener('input', ()=> speedLabel.textContent = speedEl.value + 'ms');
-// đọc input
-function parseInput(){
-  const raw = inputArrEl.value.trim();
-  if(!raw) return null;
-  const parts = raw.split(/[\s,]+/).map(x=>Number(x));
-  if(parts.some(x=>Number.isNaN(x))) return null;
-  return parts;
-}
+speedEl.oninput = () => speedLabel.textContent = speedEl.value + 'ms';
 
-function genRandom(n){
-  const a = [];
-  for(let i=0;i<n;i++) a.push(Math.floor(Math.random()*90)+10);
-  return a;
-}
-
-function buildBoxes(arr){
+function buildBoxes(arr) {
   boxesEl.innerHTML = '';
-  arrowLayer.innerHTML = '';
-  arr.forEach((v, idx) => {
-    const d = document.createElement('div');
-    d.className = 'box';
-    d.dataset.value = v;
-    d.dataset.index = idx;
-    d.textContent = v;
-    boxesEl.appendChild(d);
+  const max = Math.max(...arr, 1);
+  arr.forEach(val => {
+    const box = document.createElement('div');
+    box.className = 'box';
+    box.style.height = `${(val / max) * 100}%`;
+    box.textContent = arr.length < 25 ? val : '';
+    boxesEl.appendChild(box);
   });
 }
 
-// FLIP
-function flipSwap(i, j){
-  const childrenBefore = Array.from(boxesEl.children);
-  const rectsBefore = childrenBefore.map(c=>c.getBoundingClientRect());
-
-  const a = childrenBefore[i], b = childrenBefore[j];
-  if(!a || !b) return;
-// hoán đổi
-  if(i < j){
-    boxesEl.insertBefore(b, a);
-    const after = boxesEl.children[i+2] || null;
-    boxesEl.insertBefore(a, after);
-  } else {
-    boxesEl.insertBefore(a, b);
-    const after = boxesEl.children[j+2] || null;
-    boxesEl.insertBefore(b, after);
-  }
-
-  const childrenAfter = Array.from(boxesEl.children);
-  const rectsAfter = childrenAfter.map(c=>c.getBoundingClientRect());
-
-  // áp dụg transforms ngc
-  childrenAfter.forEach((el, idx) => {
-    const dx = rectsBefore[idx].left - rectsAfter[idx].left;
-    const dy = rectsBefore[idx].top - rectsAfter[idx].top;
-    if(dx || dy){
-      el.style.transition = 'none';
-      el.style.transform = `translate(${dx}px, ${dy}px)`;
-    }
-  });
-
-  //  reflow
-  void boxesEl.offsetWidth;
-
-  // animate về 0
-  childrenAfter.forEach(el => {
-    el.style.transition = 'transform 260ms cubic-bezier(.22,.9,.3,1)';
-    el.style.transform = '';
-  });
+function resetUI() {
+  stop();
+  steps = [];
+  stepIndex = -1;
+  currentComp = 0; currentSwp = 0;
+  compEl.textContent = '0'; swpEl.textContent = '0';
+  stepIdxEl.textContent = '0'; stepTotalEl.textContent = '0';
 }
 
-function updateBoxesFromArray(arr){
-  buildBoxes(arr);
-}
+loadBtn.onclick = () => {
+  const raw = inputArrEl.value.trim();
+  if (!raw) return alert("Hãy nhập dãy số!");
+  baseArray = raw.split(/[\s,]+/).map(Number).filter(n => !isNaN(n));
+  buildBoxes(baseArray);
+  resetUI();
+};
 
+genBtn.onclick = () => {
+  const n = parseInt(countEl.value) || 15;
+  baseArray = Array.from({length: n}, () => Math.floor(Math.random() * 95) + 5);
+  buildBoxes(baseArray);
+  resetUI();
+};
 
-function showArrowFor(i, j){
-  arrowLayer.innerHTML = '';
-  const boxes = Array.from(boxesEl.children);
-  if(i<0||j<0||i>=boxes.length||j>=boxes.length) return;
-  const ra = boxes[i].getBoundingClientRect();
-  const rb = boxes[j].getBoundingClientRect();
-  const containerRect = boxesEl.getBoundingClientRect();
-  const centerA = (ra.left + ra.right)/2 - containerRect.left;
-  const centerB = (rb.left + rb.right)/2 - containerRect.left;
-
-  const arrowA = document.createElement('div'); arrowA.className = 'arrow'; arrowA.style.left = centerA + 'px';
-  const arrowB = document.createElement('div'); arrowB.className = 'arrow'; arrowB.style.left = centerB + 'px';
-  arrowLayer.appendChild(arrowA);
-  arrowLayer.appendChild(arrowB);
-}
-
-//áp dụg 1 bc
-  function applyStep(idx){
-  if(idx < 0) idx = 0;
-  if(idx >= steps.length) idx = steps.length-1;
+function applyStep(idx) {
+  if (idx < 0 || idx >= steps.length) return;
   const s = steps[idx];
   stepIndex = idx;
-  stepIdxEl.textContent = String(idx+1);
-  stepTotalEl.textContent = String(steps.length);
-
-  if(!s) return;
+  stepIdxEl.textContent = idx + 1;
   const boxes = Array.from(boxesEl.children);
-  boxes.forEach(b => b.classList.remove('compare','swap'));
+  boxes.forEach(b => b.classList.remove('compare', 'swap'));
 
-  if(s.type === 'compare'){
-    compCount++; compEl.textContent = compCount;
-    if(boxes[s.i]) boxes[s.i].classList.add('compare');
-    if(boxes[s.j]) boxes[s.j].classList.add('compare');
-    showArrowFor(s.i, s.j);
-  } else if(s.type === 'swap'){
-    swapCount++; swpEl.textContent = swapCount;
-    if(boxes[s.i]) boxes[s.i].classList.add('swap');
-    if(boxes[s.j]) boxes[s.j].classList.add('swap');
-     
-    const t = baseArray[s.i]; baseArray[s.i] = baseArray[s.j]; baseArray[s.j] = t;
-    flipSwap(s.i, s.j);
-    showArrowFor(s.i, s.j);
-  } else if(s.type === 'overwrite'){
-    baseArray[s.i] = s.value;
-    updateBoxesFromArray(baseArray);
-  } else if(s.type === 'set'){
-    baseArray = s.array.slice();
-    updateBoxesFromArray(baseArray);
-  } else if(s.type === 'pivot'){
-    if(boxes[s.i]) boxes[s.i].classList.add('compare');
-  } else if(s.type === 'markSorted'){
-    s.indices.forEach(i => {
-      const b = boxesEl.children[i];
-      if(b) b.classList.add('sorted');
-    });
+  if (s.type === 'compare') {
+    currentComp++; compEl.textContent = currentComp;
+    boxes[s.i]?.classList.add('compare');
+    boxes[s.j]?.classList.add('compare');
+  } else if (s.type === 'swap') {
+    currentSwp++; swpEl.textContent = currentSwp;
+    boxes[s.i]?.classList.add('swap');
+    boxes[s.j]?.classList.add('swap');
+    let hI = boxes[s.i].style.height, tI = boxes[s.i].textContent;
+    boxes[s.i].style.height = boxes[s.j].style.height;
+    boxes[s.i].textContent = boxes[s.j].textContent;
+    boxes[s.j].style.height = hI;
+    boxes[s.j].textContent = tI;
+  } else if (s.type === 'overwrite') {
+    const max = Math.max(...baseArray, 1);
+    boxes[s.i].style.height = `${(s.val / max) * 100}%`;
+    boxes[s.i].textContent = baseArray.length < 25 ? s.val : '';
+    boxes[s.i].classList.add('swap');
+  } else if (s.type === 'markSorted') {
+    s.indices.forEach(i => boxes[i]?.classList.add('sorted'));
   }
 }
-   
 
+function prepareSteps() {
+  steps = [];
+  const a = [...baseArray], n = a.length, type = algoEl.value;
 
-function playInterval(){
-  if(stepIndex >= steps.length-1){ stopPlaying(); return; }
-  const rate = Number(rateEl.value) || 1;
-  const delay = Math.max(20, Number(speedEl.value) / rate);
-  timerId = setTimeout(()=> {
-    applyStep(stepIndex + 1);
-    if(playing) playInterval();
-  }, delay);
+  if (type === 'bubble') {
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n - i - 1; j++) {
+        steps.push({type:'compare', i:j, j:j+1});
+        if (a[j] > a[j+1]) { steps.push({type:'swap', i:j, j:j+1}); [a[j], a[j+1]] = [a[j+1], a[j]]; }
+      }
+      steps.push({type:'markSorted', indices:[n-1-i]});
+    }
+  } else if (type === 'selection') {
+    for (let i = 0; i < n; i++) {
+      let m = i;
+      for (let j = i + 1; j < n; j++) {
+        steps.push({type:'compare', i:m, j});
+        if (a[j] < a[m]) m = j;
+      }
+      steps.push({type:'swap', i, j:m}); [a[i], a[m]] = [a[m], a[i]];
+      steps.push({type:'markSorted', indices:[i]});
+    }
+  } else if (type === 'insertion') {
+    steps.push({type:'markSorted', indices:[0]});
+    for (let i = 1; i < n; i++) {
+      let j = i;
+      while (j > 0) {
+        steps.push({type:'compare', i:j-1, j});
+        if (a[j-1] > a[j]) { steps.push({type:'swap', i:j-1, j}); [a[j-1], a[j]] = [a[j], a[j-1]]; j--; } else break;
+      }
+      steps.push({type:'markSorted', indices: Array.from({length:i+1}, (_,k)=>k)});
+    }
+  } else if (type === 'merge') {
+    function mSort(l, r) {
+      if (r - l <= 1) return;
+      let m = Math.floor((l+r)/2); mSort(l, m); mSort(m, r);
+      let i=l, j=m, res=[];
+      while(i<m && j<r){
+        steps.push({type:'compare', i, j});
+        if(a[i]<=a[j]) res.push(a[i++]); else res.push(a[j++]);
+      }
+      while(i<m) res.push(a[i++]); while(j<r) res.push(a[j++]);
+      for(let k=0; k<res.length; k++) { a[l+k]=res[k]; steps.push({type:'overwrite', i:l+k, val:res[k]}); }
+      if(l===0 && r===n) steps.push({type:'markSorted', indices: a.map((_,idx)=>idx)});
+    }
+    mSort(0, n);
+  } else if (type === 'quick') {
+    function qSort(l, r) {
+      if (l >= r) { if(l===r) steps.push({type:'markSorted', indices:[l]}); return; }
+      let p = a[r], i = l;
+      for (let j = l; j < r; j++) {
+        steps.push({type:'compare', i:j, j:r});
+        if (a[j] < p) { steps.push({type:'swap', i, j}); [a[i], a[j]] = [a[j], a[i]]; i++; }
+      }
+      steps.push({type:'swap', i, j:r}); [a[i], a[r]] = [a[r], a[i]];
+      steps.push({type:'markSorted', indices:[i]}); qSort(l, i-1); qSort(i+1, r);
+    }
+    qSort(0, n-1);
+    steps.push({type:'markSorted', indices: a.map((_,idx)=>idx)});
+  } else if (type === 'heap') {
+    function heapify(size, i) {
+      let max = i, l = 2*i+1, r = 2*i+2;
+      if (l < size) { steps.push({type:'compare', i:l, j:max}); if(a[l]>a[max]) max=l; }
+      if (r < size) { steps.push({type:'compare', i:r, j:max}); if(a[r]>a[max]) max=r; }
+      if (max !== i) { steps.push({type:'swap', i, j:max}); [a[i], a[max]] = [a[max], a[i]]; heapify(size, max); }
+    }
+    for (let i = Math.floor(n/2)-1; i >= 0; i--) heapify(n, i);
+    for (let i = n-1; i > 0; i--) {
+      steps.push({type:'swap', i:0, j:i}); [a[0], a[i]] = [a[i], a[0]];
+      steps.push({type:'markSorted', indices:[i]}); heapify(i, 0);
+    }
+    steps.push({type:'markSorted', indices:[0]});
+  } else if (type === 'shell') {
+    for (let g = Math.floor(n/2); g > 0; g = Math.floor(g/2)) {
+      for (let i = g; i < n; i++) {
+        let j = i;
+        while (j >= g) {
+          steps.push({type:'compare', i:j-g, j});
+          if (a[j-g] > a[j]) { steps.push({type:'swap', i:j-g, j}); [a[j-g], a[j]] = [a[j], a[j-g]]; j-=g; } else break;
+        }
+      }
+    }
+    steps.push({type:'markSorted', indices: a.map((_,idx)=>idx)});
+  } else if (type === 'cocktail') {
+    let s=0, e=n-1, swap=true;
+    while(swap){
+      swap=false;
+      for(let i=s; i<e; i++){
+        steps.push({type:'compare', i, j:i+1});
+        if(a[i]>a[i+1]){ steps.push({type:'swap', i, j:i+1}); [a[i],a[i+1]]=[a[i+1],a[i]]; swap=true; }
+      }
+      steps.push({type:'markSorted', indices:[e]}); e--;
+      if(!swap) break; swap=false;
+      for(let i=e-1; i>=s; i--){
+        steps.push({type:'compare', i, j:i+1});
+        if(a[i]>a[i+1]){ steps.push({type:'swap', i, j:i+1}); [a[i],a[i+1]]=[a[i+1],a[i]]; swap=true; }
+      }
+      steps.push({type:'markSorted', indices:[s]}); s++;
+    }
+    steps.push({type:'markSorted', indices: a.map((_,idx)=>idx)});
+  } else if (type === 'counting') {
+    let mx = Math.max(...a), count = new Array(mx+1).fill(0), idx=0;
+    a.forEach(x => count[x]++);
+    for(let i=0; i<=mx; i++){
+      while(count[i]>0){ a[idx]=i; steps.push({type:'overwrite', i:idx, val:i}); idx++; count[i]--; }
+    }
+    steps.push({type:'markSorted', indices: a.map((_,idx)=>idx)});
+  }
+  stepTotalEl.textContent = steps.length;
 }
 
-function startPlaying(){
-  if(playing) return;
-  if(steps.length === 0) prepareSteps();
+function play() {
+  if (playing) return;
+  if (steps.length === 0) prepareSteps();
   playing = true; playBtn.disabled = true; pauseBtn.disabled = false;
-  playInterval();
+  const loop = () => {
+    if (!playing || stepIndex >= steps.length - 1) { stop(); return; }
+    applyStep(stepIndex + 1);
+    timerId = setTimeout(loop, speedEl.value / rateEl.value);
+  };
+  loop();
 }
 
-function stopPlaying(){
-  playing = false; playBtn.disabled = false; pauseBtn.disabled = true;
-  if(timerId) clearTimeout(timerId);
-}
+function stop() { playing = false; playBtn.disabled = false; pauseBtn.disabled = true; clearTimeout(timerId); }
 
-playBtn.addEventListener('click', ()=> startPlaying());
-pauseBtn.addEventListener('click', ()=> stopPlaying());
-nextBtn.addEventListener('click', ()=>{ if(steps.length===0) prepareSteps(); applyStep(Math.min(steps.length-1, stepIndex+1)); });
-prevBtn.addEventListener('click', ()=>{ if(steps.length===0) prepareSteps(); applyStep(Math.max(0, stepIndex-1)); });
+playBtn.onclick = play;
+pauseBtn.onclick = stop;
+document.getElementById('next').onclick = () => { if(!steps.length) prepareSteps(); applyStep(stepIndex + 1); };
+document.getElementById('prev').onclick = () => {
+  if (stepIndex < 0) return;
+  const targetIdx = stepIndex - 1; buildBoxes(baseArray);
+  currentComp = 0; currentSwp = 0;
+  for (let i = 0; i <= targetIdx; i++) applyStep(i);
+};
 
-//gọi tt ghi step
-  function prepareSteps(){
-  steps = []; stepIndex = -1; compCount = 0; swapCount = 0;
-  compEl.textContent = '0'; swpEl.textContent = '0'; stepIdxEl.textContent='0'; stepTotalEl.textContent='0';
-  
-  const arr = baseArray.slice();
-  const algo = algoEl.value;
-  if(algo === 'bubble') recordBubble(arr, steps);
-  else if(algo === 'selection') recordSelection(arr, steps);
-  else if(algo === 'insertion') recordInsertion(arr, steps);
-  else if(algo === 'merge') recordMerge(arr, steps);
-  else if(algo === 'quick') recordQuick(arr, steps);
-  else if(algo === 'heap') recordHeap(arr, steps);
-  else if(algo === 'shell') recordShell(arr, steps);
-  else if(algo === 'cocktail') recordCocktail(arr, steps);
-  else if(algo === 'counting') recordCounting(arr, steps);
-  stepTotalEl.textContent = String(steps.length);
-}
-
-//
-function recordBubble(arr, steps){
-  const a = arr.slice(); const n = a.length;
-  for(let i=0;i<n;i++){
-    for(let j=0;j<n-i-1;j++){
-      steps.push({type:'compare', i:j, j:j+1});
-      if(a[j] > a[j+1]){
-        steps.push({type:'swap', i:j, j:j+1});
-        const t = a[j]; a[j] = a[j+1]; a[j+1] = t;
-      }
-    }
-    steps.push({type:'markSorted', indices:[n-i-1]});
-  }
-  steps.push({type:'set', array:a});
-}
-
-function recordSelection(arr, steps){
-  const a = arr.slice(); const n = a.length;
-  for(let i=0;i<n-1;i++){
-    let min = i;
-    for(let j=i+1;j<n;j++){
-      steps.push({type:'compare', i:j, j:min});
-      if(a[j] < a[min]) min = j;
-    }
-    if(min !== i){
-      steps.push({type:'swap', i:i, j:min});
-      const t = a[i]; a[i] = a[min]; a[min] = t;
-    }
-    steps.push({type:'markSorted', indices:[i]});
-  }
-  steps.push({type:'set', array:a});
-}
-
-function recordInsertion(arr, steps){
-  const a = arr.slice(); const n = a.length;
-  for(let i=1;i<n;i++){
-    let j=i;
-    while(j>0){
-      steps.push({type:'compare', i:j-1, j:j});
-      if(a[j-1] > a[j]){
-        steps.push({type:'swap', i:j-1, j:j});
-        const t = a[j-1]; a[j-1] = a[j]; a[j] = t; j--;
-      } else break;
-    }
-    steps.push({type:'markSorted', indices:[i]});
-  }
-  steps.push({type:'set', array:a});
-}
-
-function recordCocktail(arr, steps){
-  const a = arr.slice(); let swapped = true; let start = 0; let end = a.length-1;
-  while(swapped){
-    swapped = false;
-    for(let i=start;i<end;i++){
-      steps.push({type:'compare', i:i, j:i+1});
-      if(a[i] > a[i+1]){ steps.push({type:'swap', i:i, j:i+1}); const t=a[i]; a[i]=a[i+1]; a[i+1]=t; swapped=true; }
-    }
-    if(!swapped) break;
-    swapped = false; end--;
-    for(let i=end-1;i>=start;i--){
-      steps.push({type:'compare', i:i, j:i+1});
-      if(a[i] > a[i+1]){ steps.push({type:'swap', i:i, j:i+1}); const t=a[i]; a[i]=a[i+1]; a[i+1]=t; swapped=true; }
-    }
-    start++;
-  }
-  steps.push({type:'set', array:a});
-}
-
-function recordMerge(arr, steps){
-  const a = arr.slice();
-  function merge(l,r){
-    if(r-l <= 1) return;
-    const m = Math.floor((l+r)/2);
-    merge(l,m); merge(m,r);
-    let i=l,j=m,temp=[];
-    while(i<m && j<r){
-      steps.push({type:'compare', i:i, j:j});
-      if(a[i] <= a[j]) temp.push(a[i++]); else temp.push(a[j++]);
-    }
-    while(i<m) temp.push(a[i++]);
-    while(j<r) temp.push(a[j++]);
-    for(let k=0;k<temp.length;k++){ steps.push({type:'overwrite', i:l+k, value:temp[k]}); a[l+k]=temp[k]; }
-  }
-  merge(0,a.length);
-  steps.push({type:'set', array:a});
-}
-
-function recordQuick(arr, steps){
-  const a = arr.slice();
-  function quick(l,r){
-    if(l>=r-1) return;
-    const pivot = a[r-1];
-    let i=l;
-    steps.push({type:'pivot', i:r-1});
-    for(let j=l;j<r-1;j++){
-      steps.push({type:'compare', i:j, j:r-1});
-      if(a[j] < pivot){ steps.push({type:'swap', i:i, j:j}); const t=a[i]; a[i]=a[j]; a[j]=t; i++; }
-    }
-    steps.push({type:'swap', i:i, j:r-1}); const t=a[i]; a[i]=a[r-1]; a[r-1]=t;
-    quick(l,i); quick(i+1,r);
-  }
-  quick(0,a.length);
-  steps.push({type:'set', array:a});
-}
-
-function recordHeap(arr, steps){
-  const a = arr.slice(); const n = a.length;
-  function heapify(n,i){
-    let largest = i; let l = 2*i+1; let r = 2*i+2;
-    if(l<n){ steps.push({type:'compare', i:l, j:largest}); if(a[l] > a[largest]) largest = l; }
-    if(r<n){ steps.push({type:'compare', i:r, j:largest}); if(a[r] > a[largest]) largest = r; }
-    if(largest !== i){ steps.push({type:'swap', i:i, j:largest}); const t=a[i]; a[i]=a[largest]; a[largest]=t; heapify(n,largest); }
-  }
-  for(let i=Math.floor(n/2)-1;i>=0;i--) heapify(n,i);
-  for(let i=n-1;i>0;i--){ steps.push({type:'swap', i:0, j:i}); const t=a[0]; a[0]=a[i]; a[i]=t; heapify(i,0); }
-  steps.push({type:'set', array:a});
-}
-
-function recordShell(arr, steps){
-  const a = arr.slice(); const n=a.length; let gap = Math.floor(n/2);
-  while(gap>0){
-    for(let i=gap;i<n;i++){
-      let j=i;
-      while(j-gap>=0){
-        steps.push({type:'compare', i:j-gap, j:j});
-        if(a[j-gap] > a[j]){ steps.push({type:'swap', i:j-gap, j:j}); const t=a[j-gap]; a[j-gap]=a[j]; a[j]=t; j-=gap; } else break;
-      }
-    }
-    gap = Math.floor(gap/2);
-  }
-  steps.push({type:'set', array:a});
-}
-
-function recordCounting(arr, steps){
-  if(arr.length===0) return;
-  const a = arr.slice();
-  const mx = Math.max(...a);
-  if(mx > 100000){ alert('Counting sort: giá trị quá lớn'); return; }
-  const count = new Array(mx+1).fill(0);
-  for(let i=0;i<a.length;i++){ steps.push({type:'set', array:a.slice()}); count[a[i]]++; }
-  let idx = 0;
-  for(let v=0; v<count.length; v++){
-    while(count[v]-->0){ steps.push({type:'overwrite', i:idx, value:v}); a[idx]=v; idx++; }
-  }
-  steps.push({type:'set', array:a});
-}
-
-// gd nut
-
-genBtn.addEventListener('click', ()=>{
-  const n = Math.max(2, Math.min(60, Number(countEl.value) || 12));
-  baseArray = genRandom(n);
-  buildBoxes(baseArray);
-  inputArrEl.value = baseArray.join(' ');
-  steps = []; stepIndex = -1;
-});
-
-loadBtn.addEventListener('click', ()=>{
-  const parsed = parseInput();
-  if(parsed){ baseArray = parsed.slice(); buildBoxes(baseArray); steps = []; stepIndex = -1; }
-  else alert('Không đọc được dãy — kiểm tra định dạng (số nguyên, phân tách bằng dấu cách hoặc dấu phẩy).');
-});
-
-// khoi tạo
-baseArray = genRandom(12);
-buildBoxes(baseArray);
-inputArrEl.value = baseArray.join(' ');
+genBtn.click();
